@@ -5,7 +5,15 @@ import { logger } from './middleware/logger';
 
 const { VoiceResponse } = twiml;
 
-const streams = new Map<string, { socket: any; meta: any }>();
+const streams = new Map<string, { callSid: string; socket: any; meta: any }>();
+const callers = new Map<string, { user: any; script: any }>();
+
+function getCaller(streamSid: string) {
+	const stream = streams.get(streamSid);
+	if (!stream) return null;
+
+	return callers.get(stream.callSid) || null;
+}
 
 const app = new Elysia()
 	.use(logger)
@@ -15,12 +23,21 @@ const app = new Elysia()
 			const phoneNumber = body.From!;
 			const callSid = body.CallSid!;
 
-			const users = await db.collection('users').where('age', '>', 25).get();
+			if (!callSid || !phoneNumber) return;
+
+			const users = await db
+				.collection('users')
+				.where('phoneNumber', '==', phoneNumber)
+				.where('subscriptionStatus', '==', 'active')
+				.limit(1)
+				.get();
+
+			if (users.empty) return;
+			const user = users.docs[0].data();
+
 			const scripts = await db.collection('scripts').get();
 
-			users.forEach((doc) => {
-				console.log(doc.id, doc.data());
-			});
+			callers.set(callSid, { user, script: null });
 
 			const response = new VoiceResponse();
 			const connect = response.connect();
@@ -57,7 +74,7 @@ const app = new Elysia()
 			switch (data.event) {
 				case 'start': {
 					const callSid = data.start.callSid;
-					streams.set(sid, { socket: ws, meta: data.start });
+					streams.set(sid, { callSid, socket: ws, meta: data.start });
 					console.log(`stream started: ${sid}`);
 					break;
 				}
