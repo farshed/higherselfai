@@ -1,9 +1,8 @@
-// import { v4 as uuidv4 } from 'uuid';
-
 const AWS_REGION = process.env.AWS_REGION!;
+const AWS_BUCKET = process.env.AWS_BUCKET!;
 
 export class S3 {
-	static getUrl(bucket: string, key: string) {
-		return `https://${bucket}.s3.${AWS_REGION}.amazonaws.com/${key}`;
+	static getURL(key: string) {
+		return `https://${AWS_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${key}`;
 	}
 }

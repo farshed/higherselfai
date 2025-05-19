@@ -12,7 +12,8 @@ const app = new Elysia()
 	.post(
 		'/twilio-webhook',
 		async ({ body, set }) => {
-			const phoneNumber = body.From;
+			const phoneNumber = body.From!;
+			const callSid = body.CallSid!;
 
 			const users = await db.collection('users').where('age', '>', 25).get();
 			const scripts = await db.collection('scripts').get();
@@ -31,7 +32,8 @@ const app = new Elysia()
 		{
 			body: t.Object(
 				{
-					From: t.Optional(t.String())
+					From: t.Optional(t.String()),
+					CallSid: t.Optional(t.String())
 				},
 				{ additionalProperties: true }
 			)
@@ -53,12 +55,14 @@ const app = new Elysia()
 
 			const sid = data.streamSid;
 			switch (data.event) {
-				case 'start':
+				case 'start': {
+					const callSid = data.start.callSid;
 					streams.set(sid, { socket: ws, meta: data.start });
 					console.log(`stream started: ${sid}`);
 					break;
+				}
 
-				case 'media':
+				case 'media': {
 					if (!streams.has(sid)) return;
 					const payload = data.media.payload;
 
@@ -71,11 +75,13 @@ const app = new Elysia()
 						})
 					);
 					break;
+				}
 
-				case 'stop':
+				case 'stop': {
 					console.log(`stream stopped: ${sid}`);
 					streams.delete(sid);
 					break;
+				}
 
 				default:
 					console.log(`unhandled event: ${data.event}`);
