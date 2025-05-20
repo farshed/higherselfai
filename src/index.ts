@@ -34,12 +34,12 @@ const app = new Elysia()
 				.limit(1)
 				.get();
 
-			if (users.empty) return;
-			const user = users.docs[0].data();
+			// if (users.empty) return;
+			// const user = users.docs[0].data();
 
 			// const scripts = await db.collection('scripts').get();
 
-			callers.set(callSid, { user, script: null });
+			// callers.set(callSid, { user, script: null });
 
 			const response = new VoiceResponse();
 			const connect = response.connect();
