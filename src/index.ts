@@ -23,6 +23,8 @@ const app = new Elysia()
 			const phoneNumber = body.From!;
 			const callSid = body.CallSid!;
 
+			console.log('body', body);
+
 			if (!callSid || !phoneNumber) return;
 
 			const users = await db
@@ -35,13 +37,13 @@ const app = new Elysia()
 			if (users.empty) return;
 			const user = users.docs[0].data();
 
-			const scripts = await db.collection('scripts').get();
+			// const scripts = await db.collection('scripts').get();
 
 			callers.set(callSid, { user, script: null });
 
 			const response = new VoiceResponse();
 			const connect = response.connect();
-			connect.stream({ url: 'wss://your-server.com/stream' });
+			connect.stream({ url: 'ws://145.79.2.115:3000/stream' });
 
 			set.headers['content-type'] = 'text/xml';
 			return response.toString();
