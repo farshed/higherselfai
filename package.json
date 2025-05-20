@@ -2,6 +2,10 @@
 	"name": "higherselfai",
 	"module": "src/index.ts",
 	"type": "module",
+	"scripts": {
+		"dev": "NODE_ENV=development bun run src/index.ts",
+		"prod": "NODE_ENV=production bun run src/index.ts"
+	},
 	"dependencies": {
 		"@sendgrid/mail": "^8.1.5",
 		"elysia": "^1.3.1",
