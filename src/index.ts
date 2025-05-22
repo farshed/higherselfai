@@ -64,7 +64,7 @@ const app = new Elysia()
 		},
 
 		message(ws, raw: any) {
-			console.log('raw', raw);
+			console.log('raw', typeof raw);
 			let data;
 			try {
 				data = JSON.parse(raw.toString());
