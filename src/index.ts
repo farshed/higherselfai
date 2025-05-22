@@ -63,16 +63,7 @@ const app = new Elysia()
 			// wait for 'start' to bind context
 		},
 
-		message(ws, raw: any) {
-			console.log('raw', typeof raw);
-			let data;
-			try {
-				data = JSON.parse(raw.toString());
-			} catch {
-				console.error('invalid json');
-				return;
-			}
-
+		message(ws, data: any) {
 			const sid = data.streamSid;
 			switch (data.event) {
 				case 'start': {
