@@ -3,6 +3,7 @@ import { twiml } from 'twilio';
 import { db } from './services/firebase';
 import { logger } from './middleware/logger';
 
+// +1 978 755 4013
 const { VoiceResponse } = twiml;
 
 const streams = new Map<string, { callSid: string; socket: any; meta: any }>();
@@ -43,7 +44,7 @@ const app = new Elysia()
 
 			const response = new VoiceResponse();
 			const connect = response.connect();
-			connect.stream({ url: 'ws://145.79.2.115:3000/stream' });
+			connect.stream({ url: 'wss://api.memestreamedia.com/stream' });
 
 			set.headers['content-type'] = 'text/xml';
 			return response.toString();
