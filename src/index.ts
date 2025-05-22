@@ -3,7 +3,6 @@ import { twiml } from 'twilio';
 import { db } from './services/firebase';
 import { logger } from './middleware/logger';
 
-// +1 978 755 4013
 const { VoiceResponse } = twiml;
 
 const streams = new Map<string, { callSid: string; socket: any; meta: any }>();
