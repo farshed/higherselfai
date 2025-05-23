@@ -6,3 +6,14 @@ admin.initializeApp({
 });
 
 export const db = admin.firestore();
+
+// db.collection('users')
+// 	.add({
+// 		name: 'Faisal',
+// 		phoneNumber: '+13412214799',
+// 		timezone: 'UTC+5',
+// 		subscriptionStatus: 'active',
+// 		lastCallDay: 0,
+// 		lastCallTimestamp: null
+// 	})
+// 	.then((res) => console.log(res.id));

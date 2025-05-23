@@ -12,51 +12,36 @@ export type Script = {};
 export type Session = {};
 
 const script = {
-	mp3s: {
-		intro: 's3://higher-self/day5/intro.mp3',
-		teaching: '...',
-		prompt: '...',
-		affirmation: '...'
-	},
-	gptPrompts: {
-		closedQ1: '...',
-		mainReflection: '...',
-		closedQ2: '...'
-	},
-	task: 'Example…Practice shifting your dominant thought today.',
-	nextTopic: 'Example…Tomorrow we begin Root Chakra grounding.',
-	journalPrompt: 'Example…What belief am I ready to release?'
+	day: 1,
+	steps: [
+		{ name: '1-opening' },
+		{
+			name: '1-what-the-program-is',
+			type: 'conditional',
+			pauseDuration: 5,
+			yes: '1-what-the-program-is-yes',
+			no: '1-what-the-program-is-no'
+		},
+		{ name: '1-how-the-program-works' },
+		{ name: '1-how-it-works-practically' },
+		{ name: '1-teaching' },
+		{ name: '1-preview-of-tomorrow' },
+		{ name: '1-closing-affirmation' }
+	]
 };
 
 // {
 // "callDay": 5,
-// "date": "2024-06-10"
-// ,
-// "transcription": {
-// "reflection": "
-// ...
-// "
-// ,
-// "closedQ1": "
-// ...
-// "
-// ,
-// "closedQ2": "
-// ...
-// "
+// "date": "2024-06-10",
+// "userResponses": {
+// 	"reflection": "...",
+// 	"closedQ1": "...",
+// 	"closedQ2": "..."
 // },
 // "gptResponses": {
-// "closedQ1": "
-// ...
-// "
-// ,
-// "mainReflection": "
-// ...
-// "
-// ,
-// "closedQ2": "
-// ...
-// "
+// "closedQ1": "...",
+// "mainReflection": "...",
+// "closedQ2": "..."
 // },
 // "emailSent": true
 // }

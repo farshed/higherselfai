@@ -2,10 +2,25 @@ import { Elysia, t } from 'elysia';
 import { twiml } from 'twilio';
 import { db } from './services/firebase';
 import { logger } from './middleware/logger';
+import { decodeMulawChunk, getMulawBase64FromUrl } from './services/audio';
+import { S3 } from './services/s3';
+import { sleep } from 'bun';
+import type { ElysiaWS } from 'elysia/ws';
 
 const { VoiceResponse } = twiml;
 
-const streams = new Map<string, { callSid: string; socket: any; meta: any }>();
+const streams = new Map<
+	string,
+	{
+		callSid: string;
+		user: any;
+		script: any;
+		shouldRecord: boolean;
+		audioBuffer: Uint8Array[];
+		socket: any;
+		meta: any;
+	}
+>();
 const callers = new Map<string, { user: any; script: any }>();
 
 function getCaller(streamSid: string) {
@@ -34,12 +49,18 @@ const app = new Elysia()
 				.limit(1)
 				.get();
 
-			// if (users.empty) return;
-			// const user = users.docs[0].data();
+			if (users.empty) return;
+			const user = users.docs[0].data();
 
-			// const scripts = await db.collection('scripts').get();
+			const scripts = await db
+				.collection('scripts')
+				.where('day', '==', user.lastCallDay + 1)
+				.get();
 
-			// callers.set(callSid, { user, script: null });
+			if (scripts.empty) return;
+			const script = scripts.docs[0].data();
+
+			callers.set(callSid, { user, script });
 
 			const response = new VoiceResponse();
 			const connect = response.connect();
@@ -63,28 +84,53 @@ const app = new Elysia()
 			// wait for 'start' to bind context
 		},
 
-		message(ws, data: any) {
+		async message(ws, data: any) {
 			const sid = data.streamSid;
+
 			switch (data.event) {
 				case 'start': {
+					const caller = getCaller(sid);
+					if (!caller) return;
+
 					const callSid = data.start.callSid;
-					streams.set(sid, { callSid, socket: ws, meta: data.start });
+
+					const { script } = caller;
+					const step = script.steps.pop();
+					if (!step) return;
+
+					streams.set(sid, {
+						callSid,
+						user: caller.user,
+						script: caller.script,
+						shouldRecord: ['dynamic', 'conditional'].includes(step.type),
+						audioBuffer: [],
+						socket: ws,
+						meta: data.start
+					});
+
+					if (!step.type) {
+						await sendAudio(ws, sid, step.name);
+					} else if (step.type === 'conditional') {
+					} else if (step.type === 'dynamic') {
+					}
+
 					console.log(`stream started: ${sid}`);
+					break;
+				}
+
+				case 'mark': {
 					break;
 				}
 
 				case 'media': {
 					if (!streams.has(sid)) return;
-					const payload = data.media.payload;
+					const stream = streams.get(sid);
 
-					// echo back for demo
-					ws.send(
-						JSON.stringify({
-							event: 'media',
-							streamSid: sid,
-							media: { payload }
-						})
-					);
+					if (stream?.shouldRecord) {
+						const chunk = decodeMulawChunk(data.media.payload);
+						stream.audioBuffer.push(chunk);
+					}
+
 					break;
 				}
 
@@ -109,3 +155,24 @@ const app = new Elysia()
 	.listen(process.env.PORT || 3000);
 
 console.log(`🦊 Server is running at ${app.server?.hostname}:${app.server?.port}`);
+
+async function sendAudio(ws: ElysiaWS, sid: string, fileName: string) {
+	const audio = await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
+	ws.send(
+		JSON.stringify({
+			event: 'media',
+			streamSid: sid,
+			media: { payload: audio }
+		})
+	);
+
+	await sleep(1);
+
+	ws.send(
+		JSON.stringify({
+			event: 'mark',
+			streamSid: sid,
+			mark: { name: fileName }
+		})
+	);
+}
