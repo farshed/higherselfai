@@ -94,19 +94,23 @@ const app = new Elysia()
 
 					const callSid = data.start.callSid;
 
-					const { script } = caller;
-					const step = script.steps.pop();
-					if (!step) return;
+					const { script, user } = caller;
+					// const step = script.steps.pop();
+					// if (!step) return;
 
-					streams.set(sid, {
-						callSid,
-						user: caller.user,
-						script: caller.script,
-						shouldRecord: ['dynamic', 'conditional'].includes(step.type),
-						audioBuffer: [],
-						socket: ws,
-						meta: data.start
-					});
+					const callSession = new CallSession(callSid, sid, ws, user, script);
+
+					streams.set(sid, callSession);
+
+					// streams.set(sid, {
+					// 	callSid,
+					// 	user: caller.user,
+					// 	script: caller.script,
+					// 	shouldRecord: ['dynamic', 'conditional'].includes(step.type),
+					// 	audioBuffer: [],
+					// 	socket: ws,
+					// 	meta: data.start
+					// });
 
 					if (!step.type) {
 						await sendAudio(ws, sid, step.name);
@@ -175,4 +179,62 @@ async function sendAudio(ws: ElysiaWS, sid: string, fileName: string) {
 			mark: { name: fileName }
 		})
 	);
+}
+
+class CallSession {
+	currentStep: any;
+	audioBuffer: Uint8Array[] = [];
+
+	constructor(
+		private callSid: string,
+		private streamSid: string,
+		private ws: ElysiaWS,
+		private user: any,
+		private script: any
+	) {
+		this.currentStep = script.steps.pop();
+		if (this.currentStep) {
+			this.sendAudio(this.currentStep.name);
+		}
+	}
+
+	processEvent(data: any) {
+		const sid = data.streamSid;
+
+		switch (data.event) {
+			case 'media': {
+				if (this.currentStep.type !== 'listen') return;
+
+				const chunk = decodeMulawChunk(data.media.payload);
+				this.audioBuffer.push(chunk);
+
+				break;
+			}
+
+			case 'mark': {
+				break;
+			}
+		}
+	}
+
+	async sendAudio(fileName: string) {
+		const audio = await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
+		this.ws.send(
+			JSON.stringify({
+				event: 'media',
+				streamSid: this.streamSid,
+				media: { payload: audio }
+			})
+		);
+
+		await sleep(1);
+
+		this.ws.send(
+			JSON.stringify({
+				event: 'mark',
+				streamSid: this.streamSid,
+				mark: { name: fileName }
+			})
+		);
+	}
 }

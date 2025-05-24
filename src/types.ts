@@ -15,10 +15,14 @@ const script = {
 	day: 1,
 	steps: [
 		{ name: '1-opening' },
+		{ name: '1-what-the-program-is' },
 		{
-			name: '1-what-the-program-is',
+			type: 'listen',
+			name: 'blank',
+			duration: 5
+		},
+		{
 			type: 'conditional',
-			pauseDuration: 5,
 			yes: '1-what-the-program-is-yes',
 			no: '1-what-the-program-is-no'
 		},
