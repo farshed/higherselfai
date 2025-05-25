@@ -81,6 +81,7 @@ const app = new Elysia()
 			switch (data.event) {
 				case 'start': {
 					const caller = getCaller(sid);
+					console.log('caller', caller);
 					if (!caller) return;
 
 					const callSid = data.start.callSid;
