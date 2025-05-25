@@ -1,25 +1,29 @@
 import { Elysia, t } from 'elysia';
 import { twiml } from 'twilio';
-import { db } from './services/firebase';
+import { createUserSession, db, updateUserFields } from './services/firebase';
 import { logger } from './middleware/logger';
-import { decodeMulawChunk, getBlankMulawAudio, getMulawBase64FromURL } from './services/audio';
+import {
+	decodeMulawChunk,
+	getBlankMulawAudio,
+	getMulawBase64FromURL,
+	wavToMulawBase64
+} from './services/audio';
 import { S3 } from './services/s3';
 import { sleep } from 'bun';
 import type { ElysiaWS } from 'elysia/ws';
+import {
+	getConditionalPrompt,
+	getDynamicPrompt,
+	OpenAI,
+	transcribeMulawBuffer
+} from './services/openai';
+import { SendGrid } from './services/sendgrid';
+import { endCall } from './services/twilio';
 
 const { VoiceResponse } = twiml;
 
 const streams = new Map<string, CallSession>();
 const callers = new Map<string, { user: any; script: any }>();
-
-function getCaller(streamSid: string) {
-	const stream = streams.get(streamSid);
-	if (!stream) return null;
-
-	console.log('stream', stream);
-
-	return callers.get(stream.callSid) || null;
-}
 
 const app = new Elysia()
 	.use(logger)
@@ -51,7 +55,7 @@ const app = new Elysia()
 			if (scripts.empty) return;
 			const script = scripts.docs[0].data();
 
-			callers.set(callSid, { user, script });
+			callers.set(callSid, { user: { ...user, id: users.docs[0].id }, script });
 
 			const response = new VoiceResponse();
 			const connect = response.connect();
@@ -71,15 +75,10 @@ const app = new Elysia()
 		}
 	)
 	.ws('/stream', {
-		open(ws) {
-			// wait for 'start' to bind context
-		},
-
+		open(ws) {},
 		async message(ws, data: any) {
 			try {
 				const sid = data.streamSid;
-
-				// console.log('event', data.event);
 
 				switch (data.event) {
 					case 'start': {
@@ -88,61 +87,29 @@ const app = new Elysia()
 						if (!caller) return;
 
 						const { script, user } = caller;
-						// const step = script.steps.shift();
-						// if (!step) return;
-
 						const callSession = new CallSession(callSid, sid, ws, user, script);
-
 						streams.set(sid, callSession);
 
-						// streams.set(sid, {
-						// 	callSid,
-						// 	user: caller.user,
-						// 	script: caller.script,
-						// 	shouldRecord: ['dynamic', 'conditional'].includes(step.type),
-						// 	audioBuffer: [],
-						// 	socket: ws,
-						// 	meta: data.start
-						// });
-
-						// if (!step.type) {
-						// 	await sendAudio(ws, sid, step.name);
-						// } else if (step.type === 'conditional') {
-						// } else if (step.type === 'dynamic') {
-						// }
-
-						console.log(`stream started: ${sid}`);
 						break;
 					}
 
 					case 'media':
-					case 'mark':
+					case 'mark': {
 						if (!streams.has(sid)) return;
 						const callSession = streams.get(sid);
 						await callSession?.processEvent(data);
-						break;
 
-					// case 'media': {
-					// 	if (!streams.has(sid)) return;
-					// 	const stream = streams.get(sid);
-
-					// 	if (stream?.shouldRecord) {
-					// 		const chunk = decodeMulawChunk(data.media.payload);
-					// 		stream.audioBuffer.push(chunk);
-					// 	}
-
-					// 	break;
-					// }
-
-					case 'stop': {
-						// TODO: send email, create session in db, delete CallSession
-						console.log(`stream stopped: ${sid}`);
-						streams.delete(sid);
 						break;
 					}
 
-					// default:
-					// 	console.log(`unhandled event: ${data.event}`);
+					case 'stop': {
+						if (!streams.has(sid)) return;
+						const callSession = streams.get(sid);
+						await callSession?.finish();
+						streams.delete(sid);
+						console.log(`stream stopped: ${sid}`);
+						break;
+					}
 				}
 			} catch (err) {
 				console.log('Error:', err);
@@ -160,30 +127,12 @@ const app = new Elysia()
 
 console.log(`🦊 Server is running at ${app.server?.hostname}:${app.server?.port}`);
 
-// async function sendAudiosa(ws: ElysiaWS, sid: string, fileName: string) {
-// 	const audio = await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
-// 	ws.send(
-// 		JSON.stringify({
-// 			event: 'media',
-// 			streamSid: sid,
-// 			media: { payload: audio }
-// 		})
-// 	);
-
-// 	await sleep(1);
-
-// 	ws.send(
-// 		JSON.stringify({
-// 			event: 'mark',
-// 			streamSid: sid,
-// 			mark: { name: fileName }
-// 		})
-// 	);
-// }
-
 class CallSession {
 	currentStep: any;
 	audioBuffer: Uint8Array[] = [];
+	transcripts: string[] = [];
+	gptResponses: string[] = [];
+	callBegin = Date.now();
 
 	constructor(
 		public callSid: string,
@@ -199,8 +148,6 @@ class CallSession {
 	}
 
 	async processEvent(data: any) {
-		const sid = data.streamSid;
-
 		switch (data.event) {
 			case 'media': {
 				if (this.currentStep?.type !== 'listen') return;
@@ -214,9 +161,37 @@ class CallSession {
 			case 'mark': {
 				if (data.mark.name === this.currentStep.name) {
 					this.currentStep = this.script.steps.shift();
-					if (!this.currentStep) return this.ws.close();
+					if (!this.currentStep) {
+						return endCall(this.callSid);
+					}
 
-					await this.sendAudio(this.currentStep.name);
+					if (this.currentStep?.type === 'conditional') {
+						const buf = Buffer.concat(this.audioBuffer.map((chunk) => Buffer.from(chunk)));
+						const transcript = await transcribeMulawBuffer(buf);
+						this.transcripts.push(transcript);
+
+						const prompt = getConditionalPrompt(this.currentStep.question, transcript);
+						const response = await OpenAI.chatGPT(prompt);
+						await this.sendAudio(this.currentStep?.[response?.toLowerCase() || 'no']);
+
+						this.audioBuffer = [];
+					} else if (this.currentStep?.type === 'dynamic') {
+						const buf = Buffer.concat(this.audioBuffer.map((chunk) => Buffer.from(chunk)));
+						const transcript = await transcribeMulawBuffer(buf);
+						this.transcripts.push(transcript);
+
+						const prompt = getDynamicPrompt(this.currentStep.question, transcript);
+						const response = await OpenAI.chatGPT(prompt);
+						this.gptResponses.push(response!);
+						const wavBuf = await OpenAI.textToSpeech(response!);
+
+						const mulaw = await wavToMulawBase64(wavBuf);
+						await this.sendAudio(this.currentStep.name, mulaw);
+
+						this.audioBuffer = [];
+					} else {
+						await this.sendAudio(this.currentStep.name);
+					}
 				}
 
 				break;
@@ -224,27 +199,16 @@ class CallSession {
 		}
 	}
 
-	async sendAudio(fileName: string) {
+	async sendAudio(fileName: string, base64Audio?: string) {
 		console.log({ fileName });
-		const audio =
-			fileName === 'blank'
-				? getBlankMulawAudio(this.currentStep.duration)
-				: await getMulawBase64FromURL(S3.getURL(`${fileName}.wav`));
+		let audio = base64Audio;
 
-		// for (let i = 0; i < audio.length; i += 160) {
-		// 	const chunk = audio.slice(i, i + 160);
-		// 	const payload = Buffer.from(chunk).toString('base64');
-
-		// 	this.ws.send(
-		// 		JSON.stringify({
-		// 			event: 'media',
-		// 			streamSid: this.streamSid,
-		// 			media: { payload }
-		// 		})
-		// 	);
-
-		// 	await sleep(20);
-		// }
+		if (!audio) {
+			audio =
+				fileName === 'blank'
+					? getBlankMulawAudio(this.currentStep.duration)
+					: await getMulawBase64FromURL(S3.getURL(`${fileName}.wav`));
+		}
 
 		this.ws.send(
 			JSON.stringify({
@@ -274,13 +238,64 @@ class CallSession {
 			})
 		);
 	}
+
+	async finish() {
+		const callTS = new Date(this.callBegin).toISOString();
+		await updateUserFields(this.user, callTS);
+
+		const emailTemplates = await db
+			.collection('emailTemplates')
+			.where('day', '==', this.user.lastCallDay + 1)
+			.limit(1)
+			.get();
+
+		let emailSent = false;
+
+		if (!emailTemplates.empty) {
+			const template = emailTemplates.docs[0].data();
+
+			// TODO: await SendGrid.sendEmail()
+			emailSent = true;
+		}
+
+		await createUserSession({
+			phoneNumber: this.user.phoneNumber,
+			callDay: this.user.lastCallDay + 1,
+			transcripts: this.transcripts,
+			gptResponses: this.gptResponses,
+			callDuration: Date.now() - this.callBegin,
+			emailSent
+		});
+	}
 }
 
-// {
-//  "event": "mark",
-//  "sequenceNumber": "4",
-//  "streamSid": "MZXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-//  "mark": {
-//    "name": "my label"
-//  }
+// async function test() {
+// 	const res = fs.readFileSync('./audio/test.wav');
+// 	const buf = Buffer.from(res);
+
+// 	const dataOffset = buf.indexOf('data');
+// 	if (dataOffset === -1) throw new Error('no data chunk found');
+
+// 	const dataStart = dataOffset + 8;
+// 	const rawMulaw = buf.subarray(dataStart);
+
+// 	const transcript = await transcribeMulawBuffer(rawMulaw);
+// 	console.log({ transcript });
 // }
+
+// test();
+
+// async function test() {
+// 	const users = await db
+// 		.collection('users')
+// 		.where('phoneNumber', '==', '+13412214799')
+// 		.where('subscriptionStatus', '==', 'active')
+// 		.limit(1)
+// 		.get();
+
+// 	if (users.empty) return;
+// 	const user = { ...users.docs[0].data(), id: users.docs[0].id };
+// 	console.log(user);
+// }
+
+// test();

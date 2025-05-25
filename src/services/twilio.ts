@@ -1,9 +1,13 @@
-// import twilio from 'twilio';
+import twilio from 'twilio';
 
-// const accountSid = 'your_account_sid';
-// const authToken = 'your_auth_token';
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
 
-// export const client = twilio(accountSid, authToken);
+const client = twilio(accountSid, authToken);
+
+export async function endCall(callSid: string) {
+	await client.calls(callSid).update({ status: 'completed' });
+}
 
 // const call = await client.calls.create({
 // 	url: 'https://handler.twilio.com/twiml/EHxxxxxxxxxxxxxx', // this has your call instructions

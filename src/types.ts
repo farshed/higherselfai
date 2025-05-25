@@ -23,6 +23,7 @@ const script = {
 		},
 		{
 			type: 'conditional',
+			question: `Have you ever intentionally taken a moment to connect with your Higher Self before today?`,
 			yes: '1-what-the-program-is-yes',
 			no: '1-what-the-program-is-no'
 		},
