@@ -90,22 +90,13 @@ export async function getMulawBase64FromURL(url: string) {
 	const buf = Buffer.from(await res.arrayBuffer());
 
 	// find 'data' chunk start
-	const dataChunkOffset = buf.indexOf('data');
-	if (dataChunkOffset === -1) throw new Error('no data chunk in wav');
+	const dataOffset = buf.indexOf('data');
+	if (dataOffset === -1) throw new Error('no data chunk found');
 
-	const dataStart = dataChunkOffset + 8;
-	const pcm = buf.subarray(dataStart);
+	const dataStart = dataOffset + 8;
+	const rawMulaw = buf.subarray(dataStart);
 
-	// should be 2 bytes per sample
-	const numSamples = pcm.length / 2;
-	const mulaw = new Uint8Array(numSamples);
-
-	for (let i = 0; i < numSamples; i++) {
-		const sample = pcm.readInt16LE(i * 2);
-		mulaw[i] = linearToMulaw(sample);
-	}
-
-	return Buffer.from(mulaw).toString('base64');
+	return rawMulaw.toString('base64');
 }
 
 // export async function getMulawFromURL(url: string) {
