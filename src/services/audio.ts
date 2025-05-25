@@ -84,49 +84,25 @@ function linearToMulaw(sample: number): number {
 }
 
 export async function getMulawBase64FromURL(url: string) {
-	console.log('url', url);
 	const res = await fetch(url);
-	if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
-
-	// const inputStream = res.body;
-	// const outputStream = new PassThrough();
-	// const chunks: any[] = [];
-
-	// return new Promise((resolve, reject) => {
-	// 	ffmpeg(inputStream as any)
-	// 		.format('mulaw')
-	// 		.audioFrequency(8000)
-	// 		.audioChannels(1)
-	// 		.outputOptions('-f mulaw')
-	// 		.on('error', reject)
-	// 		.on('end', () => {
-	// 			const raw = Buffer.concat(chunks);
-	// 			const b64 = raw.toString('base64');
-	// 			resolve(b64);
-	// 		})
-	// 		.pipe(outputStream);
-
-	// 	outputStream.on('data', (chunk) => chunks.push(chunk));
-	// });
+	if (!res.ok) throw new Error(`failed to fetch: ${res.status}`);
 
 	const buf = Buffer.from(await res.arrayBuffer());
 
-	const dataOffset = buf.indexOf('data') + 8;
-	const pcm = buf.subarray(dataOffset);
+	// find 'data' chunk start
+	const dataChunkOffset = buf.indexOf('data');
+	if (dataChunkOffset === -1) throw new Error('no data chunk in wav');
 
-	// const mulaw = new Uint8Array(pcm.length / 2);
+	const dataStart = dataChunkOffset + 8;
+	const pcm = buf.subarray(dataStart);
 
-	// for (let i = 0; i < pcm.length; i += 2) {
-	// 	const sample = buf.readInt16LE(dataOffset + i);
-	// 	mulaw[i / 2] = linearToMulaw(sample);
-	// }
+	// should be 2 bytes per sample
+	const numSamples = pcm.length / 2;
+	const mulaw = new Uint8Array(numSamples);
 
-	const mulaw = new Uint8Array(pcm.length / 6);
-
-	let outIndex = 0;
-	for (let i = 0; i < pcm.length; i += 6) {
-		const sample = pcm.readInt16LE(i);
-		mulaw[outIndex++] = linearToMulaw(sample);
+	for (let i = 0; i < numSamples; i++) {
+		const sample = pcm.readInt16LE(i * 2);
+		mulaw[i] = linearToMulaw(sample);
 	}
 
 	return Buffer.from(mulaw).toString('base64');
