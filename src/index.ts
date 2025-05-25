@@ -16,6 +16,8 @@ function getCaller(streamSid: string) {
 	const stream = streams.get(streamSid);
 	if (!stream) return null;
 
+	console.log('stream', stream);
+
 	return callers.get(stream.callSid) || null;
 }
 
