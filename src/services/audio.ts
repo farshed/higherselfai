@@ -70,31 +70,58 @@ ffmpeg.setFfmpegPath(ffmpegPath!);
 //   }
 // }
 
+function linearToMulaw(sample: number): number {
+	const MULAW_MAX = 0x1fff;
+	const BIAS = 0x84;
+	let sign = (sample >> 8) & 0x80;
+	if (sign) sample = -sample;
+	sample = Math.min(sample + BIAS, MULAW_MAX);
+
+	const exponent = Math.floor(Math.log2(sample)) - 5;
+	const mantissa = (sample >> (exponent + 3)) & 0x0f;
+	const mulaw = ~(sign | ((exponent << 4) & 0x70) | mantissa);
+	return mulaw & 0xff;
+}
+
 export async function getMulawBase64FromURL(url: string) {
 	console.log('url', url);
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
 
-	const inputStream = res.body;
-	const outputStream = new PassThrough();
-	const chunks: any[] = [];
+	// const inputStream = res.body;
+	// const outputStream = new PassThrough();
+	// const chunks: any[] = [];
 
-	return new Promise((resolve, reject) => {
-		ffmpeg(inputStream as any)
-			.format('mulaw')
-			.audioFrequency(8000)
-			.audioChannels(1)
-			.outputOptions('-f mulaw')
-			.on('error', reject)
-			.on('end', () => {
-				const raw = Buffer.concat(chunks);
-				const b64 = raw.toString('base64');
-				resolve(b64);
-			})
-			.pipe(outputStream);
+	// return new Promise((resolve, reject) => {
+	// 	ffmpeg(inputStream as any)
+	// 		.format('mulaw')
+	// 		.audioFrequency(8000)
+	// 		.audioChannels(1)
+	// 		.outputOptions('-f mulaw')
+	// 		.on('error', reject)
+	// 		.on('end', () => {
+	// 			const raw = Buffer.concat(chunks);
+	// 			const b64 = raw.toString('base64');
+	// 			resolve(b64);
+	// 		})
+	// 		.pipe(outputStream);
 
-		outputStream.on('data', (chunk) => chunks.push(chunk));
-	});
+	// 	outputStream.on('data', (chunk) => chunks.push(chunk));
+	// });
+
+	const buf = Buffer.from(await res.arrayBuffer());
+
+	const dataOffset = buf.indexOf('data') + 8;
+	const pcm = buf.subarray(dataOffset);
+
+	const mulaw = new Uint8Array(pcm.length / 2);
+
+	for (let i = 0; i < pcm.length; i += 2) {
+		const sample = buf.readInt16LE(dataOffset + i);
+		mulaw[i / 2] = linearToMulaw(sample);
+	}
+
+	return Buffer.from(mulaw).toString('base64');
 }
 
 export function decodeMulawChunk(payload: string) {
