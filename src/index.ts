@@ -242,7 +242,9 @@ class CallSession {
 
 	async finish() {
 		const callTS = new Date(this.callBegin).toISOString();
-		await updateUserFields(this.user, callTS);
+		const callDuration = Date.now() - this.callBegin;
+		// TODO: uncomment
+		// await updateUserFields(this.user, callTS);
 
 		const emailTemplates = await db
 			.collection('emailTemplates')
@@ -256,7 +258,8 @@ class CallSession {
 			const template = emailTemplates.docs[0].data();
 
 			const variables = {
-				...this.user
+				...this.user,
+				callDuration
 			};
 
 			// TODO: await SendGrid.sendEmail()
@@ -268,7 +271,7 @@ class CallSession {
 			callDay: this.user.lastCallDay + 1,
 			transcripts: this.transcripts,
 			gptResponses: this.gptResponses,
-			callDuration: Date.now() - this.callBegin,
+			callDuration,
 			emailSent
 		});
 	}
