@@ -76,6 +76,8 @@ const app = new Elysia()
 		async message(ws, data: any) {
 			const sid = data.streamSid;
 
+			console.log('event', data.event);
+
 			switch (data.event) {
 				case 'start': {
 					const caller = getCaller(sid);
@@ -138,8 +140,8 @@ const app = new Elysia()
 					break;
 				}
 
-				default:
-					console.log(`unhandled event: ${data.event}`);
+				// default:
+				// 	console.log(`unhandled event: ${data.event}`);
 			}
 		},
 
