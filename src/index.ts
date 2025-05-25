@@ -82,11 +82,11 @@ const app = new Elysia()
 
 			switch (data.event) {
 				case 'start': {
-					const caller = getCaller(sid);
+					const callSid = data.start.callSid;
+
+					const caller = callers.get(callSid);
 					console.log('caller', caller);
 					if (!caller) return;
-
-					const callSid = data.start.callSid;
 
 					const { script, user } = caller;
 					console.log('script', script);
