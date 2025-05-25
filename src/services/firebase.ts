@@ -36,13 +36,13 @@ export async function createUserSession(session: any) {
 // 	})
 // 	.then((res) => console.log(res.id));
 
-db.collection('emailTemplates')
-	.add({
-		day: 1,
-		subject: 'HigherSelf Journal',
-		body: `<p>Email body</p>`
-	})
-	.then((res) => console.log(res.id));
+// db.collection('emailTemplates')
+// 	.add({
+// 		day: 1,
+// 		subject: 'HigherSelf Journal',
+// 		body: `<p>Email body</p>`
+// 	})
+// 	.then((res) => console.log(res.id));
 
 // db.collection('scripts')
 // 	.add({

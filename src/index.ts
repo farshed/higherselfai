@@ -47,8 +47,6 @@ const app = new Elysia()
 			if (users.empty) return;
 			const user = users.docs[0].data();
 
-			console.log('user', user);
-
 			const scripts = await db
 				.collection('scripts')
 				.where('day', '==', user.lastCallDay + 1)
