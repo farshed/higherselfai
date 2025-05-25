@@ -84,6 +84,7 @@ const app = new Elysia()
 					const callSid = data.start.callSid;
 
 					const { script, user } = caller;
+					console.log('script', script);
 					// const step = script.steps.pop();
 					// if (!step) return;
 
@@ -218,6 +219,7 @@ class CallSession {
 	}
 
 	async sendAudio(fileName: string) {
+		console.log({ fileName });
 		const audio =
 			fileName === 'blank'
 				? getBlankMulawAudio(this.currentStep.duration)
