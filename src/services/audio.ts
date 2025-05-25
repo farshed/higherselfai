@@ -1,95 +1,9 @@
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from 'ffmpeg-static';
-import { PassThrough } from 'stream';
-
-ffmpeg.setFfmpegPath(ffmpegPath!);
-
-// class CallSession {
-//   constructor(streamSid, websocket, script) {
-//     this.sid = streamSid
-//     this.ws = websocket
-//     this.script = script
-//     this.state = {} // anything you want to track
-//     this.index = 0
-//     this.waitingForUser = false
-//     this.audioBuffer = []
-//   }
-
-//   async start() {
-//     while (this.index < this.script.length) {
-//       const step = this.script[this.index]
-
-//       if (step.type === 'static') {
-//         await this.sendAudio(step.audioUrl)
-//       }
-
-//       if (step.type === 'conditional') {
-//         await this.sendAudio(step.questionAudioUrl)
-//         const userText = await this.waitForUserResponse()
-//         const choice = step.condition(userText) ? step.ifTrue : step.ifFalse
-//         await this.sendAudio(choice)
-//       }
-
-//       if (step.type === 'dynamic') {
-//         const userText = await this.waitForUserResponse()
-//         const aiResponseAudio = await generateAudioFromAi(step.prompt, userText)
-//         await this.sendAudio(aiResponseAudio)
-//       }
-
-//       this.index++
-//     }
-
-//     this.ws.close()
-//   }
-
-//   async sendAudio(audioUrlOrData) {
-//     // fetch -> ffmpeg transcode -> base64 encode -> chunk + send every ~20ms
-//     const b64 = await getBase64MulawAudio(audioUrlOrData)
-//     const chunks = splitIntoChunks(b64, 214)
-//     for (const chunk of chunks) {
-//       this.ws.send(JSON.stringify({
-//         event: 'media',
-//         streamSid: this.sid,
-//         media: { payload: chunk }
-//       }))
-//       await sleep(20) // pacing
-//     }
-//   }
-
-//   waitForUserResponse() {
-//     return new Promise((resolve) => {
-//       this.waitingForUser = resolve
-//     })
-//   }
-
-//   handleIncomingUserAudio(text) {
-//     if (this.waitingForUser) {
-//       this.waitingForUser(text)
-//       this.waitingForUser = null
-//     }
-//   }
-// }
-
-function linearToMulaw(sample: number): number {
-	const MULAW_MAX = 0x1fff;
-	const BIAS = 0x84;
-	let sign = (sample >> 8) & 0x80;
-	if (sign) sample = -sample;
-	sample = Math.min(sample + BIAS, MULAW_MAX);
-
-	const exponent = Math.floor(Math.log2(sample)) - 5;
-	const mantissa = (sample >> (exponent + 3)) & 0x0f;
-	const mulaw = ~(sign | ((exponent << 4) & 0x70) | mantissa);
-	return mulaw & 0xff;
-}
-
 export async function getMulawBase64FromURL(url: string) {
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`failed to fetch: ${res.status}`);
 
 	const buf = Buffer.from(await res.arrayBuffer());
 
-	// find 'data' chunk start
 	const dataOffset = buf.indexOf('data');
 	if (dataOffset === -1) throw new Error('no data chunk found');
 
