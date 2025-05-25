@@ -2,25 +2,14 @@ import { Elysia, t } from 'elysia';
 import { twiml } from 'twilio';
 import { db } from './services/firebase';
 import { logger } from './middleware/logger';
-import { decodeMulawChunk, getMulawBase64FromUrl } from './services/audio';
+import { decodeMulawChunk, getBlankMulawAudio, getMulawBase64FromUrl } from './services/audio';
 import { S3 } from './services/s3';
 import { sleep } from 'bun';
 import type { ElysiaWS } from 'elysia/ws';
 
 const { VoiceResponse } = twiml;
 
-const streams = new Map<
-	string,
-	{
-		callSid: string;
-		user: any;
-		script: any;
-		shouldRecord: boolean;
-		audioBuffer: Uint8Array[];
-		socket: any;
-		meta: any;
-	}
->();
+const streams = new Map<string, CallSession>();
 const callers = new Map<string, { user: any; script: any }>();
 
 function getCaller(streamSid: string) {
@@ -112,33 +101,37 @@ const app = new Elysia()
 					// 	meta: data.start
 					// });
 
-					if (!step.type) {
-						await sendAudio(ws, sid, step.name);
-					} else if (step.type === 'conditional') {
-					} else if (step.type === 'dynamic') {
-					}
+					// if (!step.type) {
+					// 	await sendAudio(ws, sid, step.name);
+					// } else if (step.type === 'conditional') {
+					// } else if (step.type === 'dynamic') {
+					// }
 
 					console.log(`stream started: ${sid}`);
 					break;
 				}
 
-				case 'mark': {
-					break;
-				}
-
-				case 'media': {
+				case 'media':
+				case 'mark':
 					if (!streams.has(sid)) return;
-					const stream = streams.get(sid);
-
-					if (stream?.shouldRecord) {
-						const chunk = decodeMulawChunk(data.media.payload);
-						stream.audioBuffer.push(chunk);
-					}
-
+					const callSession = streams.get(sid);
+					await callSession?.processEvent(data);
 					break;
-				}
+
+				// case 'media': {
+				// 	if (!streams.has(sid)) return;
+				// 	const stream = streams.get(sid);
+
+				// 	if (stream?.shouldRecord) {
+				// 		const chunk = decodeMulawChunk(data.media.payload);
+				// 		stream.audioBuffer.push(chunk);
+				// 	}
+
+				// 	break;
+				// }
 
 				case 'stop': {
+					// TODO: send email, create session in db, delete CallSession
 					console.log(`stream stopped: ${sid}`);
 					streams.delete(sid);
 					break;
@@ -151,7 +144,7 @@ const app = new Elysia()
 
 		close(ws) {
 			for (const [sid, ctx] of streams.entries()) {
-				if (ctx.socket === ws) streams.delete(sid);
+				if (ctx.ws === ws) streams.delete(sid);
 			}
 		}
 	})
@@ -160,37 +153,37 @@ const app = new Elysia()
 
 console.log(`🦊 Server is running at ${app.server?.hostname}:${app.server?.port}`);
 
-async function sendAudio(ws: ElysiaWS, sid: string, fileName: string) {
-	const audio = await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
-	ws.send(
-		JSON.stringify({
-			event: 'media',
-			streamSid: sid,
-			media: { payload: audio }
-		})
-	);
+// async function sendAudiosa(ws: ElysiaWS, sid: string, fileName: string) {
+// 	const audio = await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
+// 	ws.send(
+// 		JSON.stringify({
+// 			event: 'media',
+// 			streamSid: sid,
+// 			media: { payload: audio }
+// 		})
+// 	);
 
-	await sleep(1);
+// 	await sleep(1);
 
-	ws.send(
-		JSON.stringify({
-			event: 'mark',
-			streamSid: sid,
-			mark: { name: fileName }
-		})
-	);
-}
+// 	ws.send(
+// 		JSON.stringify({
+// 			event: 'mark',
+// 			streamSid: sid,
+// 			mark: { name: fileName }
+// 		})
+// 	);
+// }
 
 class CallSession {
 	currentStep: any;
 	audioBuffer: Uint8Array[] = [];
 
 	constructor(
-		private callSid: string,
-		private streamSid: string,
-		private ws: ElysiaWS,
-		private user: any,
-		private script: any
+		public callSid: string,
+		public streamSid: string,
+		public ws: ElysiaWS,
+		public user: any,
+		public script: any
 	) {
 		this.currentStep = script.steps.pop();
 		if (this.currentStep) {
@@ -198,12 +191,12 @@ class CallSession {
 		}
 	}
 
-	processEvent(data: any) {
+	async processEvent(data: any) {
 		const sid = data.streamSid;
 
 		switch (data.event) {
 			case 'media': {
-				if (this.currentStep.type !== 'listen') return;
+				if (this.currentStep?.type !== 'listen') return;
 
 				const chunk = decodeMulawChunk(data.media.payload);
 				this.audioBuffer.push(chunk);
@@ -212,13 +205,24 @@ class CallSession {
 			}
 
 			case 'mark': {
+				if (data.mark.name === this.currentStep.name) {
+					this.currentStep = this.script.steps.pop();
+					if (!this.currentStep) return this.ws.close();
+
+					await this.sendAudio(this.currentStep.name);
+				}
+
 				break;
 			}
 		}
 	}
 
 	async sendAudio(fileName: string) {
-		const audio = await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
+		const audio =
+			fileName === 'blank'
+				? getBlankMulawAudio(this.currentStep.duration)
+				: await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
+
 		this.ws.send(
 			JSON.stringify({
 				event: 'media',
@@ -238,3 +242,12 @@ class CallSession {
 		);
 	}
 }
+
+// {
+//  "event": "mark",
+//  "sequenceNumber": "4",
+//  "streamSid": "MZXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+//  "mark": {
+//    "name": "my label"
+//  }
+// }
