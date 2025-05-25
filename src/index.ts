@@ -143,7 +143,8 @@ class CallSession {
 	) {
 		this.currentStep = script.steps.shift();
 		if (this.currentStep) {
-			this.sendAudio(this.currentStep.name);
+			const label = this.currentStep.name;
+			this.sendAudio(`${label}.wav`, label);
 		}
 	}
 
@@ -172,7 +173,9 @@ class CallSession {
 
 						const prompt = getConditionalPrompt(this.currentStep.question, transcript);
 						const response = await OpenAI.chatGPT(prompt);
-						await this.sendAudio(this.currentStep?.[response?.toLowerCase() || 'no']);
+
+						const fileName = `${this.currentStep?.[response?.toLowerCase() || 'no']}.wav`;
+						await this.sendAudio(fileName, this.currentStep.name);
 
 						this.audioBuffer = [];
 					} else if (this.currentStep?.type === 'dynamic') {
@@ -186,11 +189,11 @@ class CallSession {
 						const wavBuf = await OpenAI.textToSpeech(response!);
 
 						const mulaw = await wavToMulawBase64(wavBuf);
-						await this.sendAudio(this.currentStep.name, mulaw);
+						await this.sendAudio(mulaw, this.currentStep.name);
 
 						this.audioBuffer = [];
 					} else {
-						await this.sendAudio(this.currentStep.name);
+						await this.sendAudio(`${this.currentStep.name}.wav`, this.currentStep.name);
 					}
 				}
 
@@ -199,16 +202,11 @@ class CallSession {
 		}
 	}
 
-	async sendAudio(fileName: string, base64Audio?: string) {
-		console.log({ fileName });
-		let audio = base64Audio;
-
-		if (!audio) {
-			audio =
-				fileName === 'blank'
-					? getBlankMulawAudio(this.currentStep.duration)
-					: await getMulawBase64FromURL(S3.getURL(`${fileName}.wav`));
-		}
+	async sendAudio(filenameOrAudio: string, mark: string) {
+		console.log({ mark });
+		const audio = filenameOrAudio.endsWith('.wav')
+			? await getMulawBase64FromURL(S3.getURL(filenameOrAudio))
+			: filenameOrAudio;
 
 		this.ws.send(
 			JSON.stringify({
@@ -234,7 +232,7 @@ class CallSession {
 			JSON.stringify({
 				event: 'mark',
 				streamSid: this.streamSid,
-				mark: { name: fileName }
+				mark: { name: mark }
 			})
 		);
 	}
