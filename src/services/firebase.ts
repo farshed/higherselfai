@@ -27,9 +27,10 @@ export async function createUserSession(session: any) {
 
 // db.collection('users')
 // 	.add({
-// 		name: 'Faisal',
-// 		phoneNumber: '+13412214799',
-// 		timezone: 'UTC+5',
+// 		name: 'Michael',
+// 		phoneNumber: '+13133207775',
+// 		email: 'ruvested@gmail.com',
+// 		timezone: 'UTC-4',
 // 		subscriptionStatus: 'active',
 // 		lastCallDay: 0,
 // 		lastCallTimestamp: null
