@@ -88,7 +88,7 @@ const app = new Elysia()
 						if (!caller) return;
 
 						const { script, user } = caller;
-						// const step = script.steps.pop();
+						// const step = script.steps.shift();
 						// if (!step) return;
 
 						const callSession = new CallSession(callSid, sid, ws, user, script);
@@ -192,7 +192,7 @@ class CallSession {
 		public user: any,
 		public script: any
 	) {
-		this.currentStep = script.steps.pop();
+		this.currentStep = script.steps.shift();
 		if (this.currentStep) {
 			this.sendAudio(this.currentStep.name);
 		}
@@ -213,7 +213,7 @@ class CallSession {
 
 			case 'mark': {
 				if (data.mark.name === this.currentStep.name) {
-					this.currentStep = this.script.steps.pop();
+					this.currentStep = this.script.steps.shift();
 					if (!this.currentStep) return this.ws.close();
 
 					await this.sendAudio(this.currentStep.name);
