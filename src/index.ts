@@ -235,30 +235,30 @@ class CallSession {
 			fileName === 'blank'
 				? // TODO: fix getblankmulaw audio to return uint8
 				  getBlankMulawAudio(this.currentStep.duration)
-				: await getMulawFromURL(S3.getURL(`${fileName}.wav`));
+				: await getMulawBase64FromURL(S3.getURL(`${fileName}.wav`));
 
-		for (let i = 0; i < audio.length; i += 160) {
-			const chunk = audio.slice(i, i + 160);
-			const payload = Buffer.from(chunk).toString('base64');
+		// for (let i = 0; i < audio.length; i += 160) {
+		// 	const chunk = audio.slice(i, i + 160);
+		// 	const payload = Buffer.from(chunk).toString('base64');
 
-			this.ws.send(
-				JSON.stringify({
-					event: 'media',
-					streamSid: this.streamSid,
-					media: { payload }
-				})
-			);
+		// 	this.ws.send(
+		// 		JSON.stringify({
+		// 			event: 'media',
+		// 			streamSid: this.streamSid,
+		// 			media: { payload }
+		// 		})
+		// 	);
 
-			await sleep(20);
-		}
+		// 	await sleep(20);
+		// }
 
-		// this.ws.send(
-		// 	JSON.stringify({
-		// 		event: 'media',
-		// 		streamSid: this.streamSid,
-		// 		media: { payload: audio }
-		// 	})
-		// );
+		this.ws.send(
+			JSON.stringify({
+				event: 'media',
+				streamSid: this.streamSid,
+				media: { payload: audio }
+			})
+		);
 
 		await sleep(1);
 

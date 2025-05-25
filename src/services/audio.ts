@@ -114,11 +114,12 @@ export async function getMulawBase64FromURL(url: string) {
 	const dataOffset = buf.indexOf('data') + 8;
 	const pcm = buf.subarray(dataOffset);
 
-	const mulaw = new Uint8Array(pcm.length / 2);
+	const mulaw = new Uint8Array(pcm.length / 6);
 
-	for (let i = 0; i < pcm.length; i += 2) {
-		const sample = buf.readInt16LE(dataOffset + i);
-		mulaw[i / 2] = linearToMulaw(sample);
+	let outIndex = 0;
+	for (let i = 0; i < pcm.length; i += 6) {
+		const sample = pcm.readInt16LE(i);
+		mulaw[outIndex++] = linearToMulaw(sample);
 	}
 
 	return Buffer.from(mulaw).toString('base64');
