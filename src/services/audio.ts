@@ -70,7 +70,8 @@ ffmpeg.setFfmpegPath(ffmpegPath!);
 //   }
 // }
 
-export async function getMulawBase64FromUrl(url: string) {
+export async function getMulawBase64FromURL(url: string) {
+	console.log('url', url);
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
 

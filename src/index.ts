@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia';
 import { twiml } from 'twilio';
 import { db } from './services/firebase';
 import { logger } from './middleware/logger';
-import { decodeMulawChunk, getBlankMulawAudio, getMulawBase64FromUrl } from './services/audio';
+import { decodeMulawChunk, getBlankMulawAudio, getMulawBase64FromURL } from './services/audio';
 import { S3 } from './services/s3';
 import { sleep } from 'bun';
 import type { ElysiaWS } from 'elysia/ws';
@@ -76,75 +76,76 @@ const app = new Elysia()
 		},
 
 		async message(ws, data: any) {
-			const sid = data.streamSid;
+			try {
+				const sid = data.streamSid;
 
-			console.log('event', data.event);
+				// console.log('event', data.event);
 
-			switch (data.event) {
-				case 'start': {
-					const callSid = data.start.callSid;
+				switch (data.event) {
+					case 'start': {
+						const callSid = data.start.callSid;
+						const caller = callers.get(callSid);
+						if (!caller) return;
 
-					const caller = callers.get(callSid);
-					console.log('caller', caller);
-					if (!caller) return;
+						const { script, user } = caller;
+						// const step = script.steps.pop();
+						// if (!step) return;
 
-					const { script, user } = caller;
-					console.log('script', script);
-					// const step = script.steps.pop();
-					// if (!step) return;
+						const callSession = new CallSession(callSid, sid, ws, user, script);
 
-					const callSession = new CallSession(callSid, sid, ws, user, script);
+						streams.set(sid, callSession);
 
-					streams.set(sid, callSession);
+						// streams.set(sid, {
+						// 	callSid,
+						// 	user: caller.user,
+						// 	script: caller.script,
+						// 	shouldRecord: ['dynamic', 'conditional'].includes(step.type),
+						// 	audioBuffer: [],
+						// 	socket: ws,
+						// 	meta: data.start
+						// });
 
-					// streams.set(sid, {
-					// 	callSid,
-					// 	user: caller.user,
-					// 	script: caller.script,
-					// 	shouldRecord: ['dynamic', 'conditional'].includes(step.type),
-					// 	audioBuffer: [],
-					// 	socket: ws,
-					// 	meta: data.start
-					// });
+						// if (!step.type) {
+						// 	await sendAudio(ws, sid, step.name);
+						// } else if (step.type === 'conditional') {
+						// } else if (step.type === 'dynamic') {
+						// }
 
-					// if (!step.type) {
-					// 	await sendAudio(ws, sid, step.name);
-					// } else if (step.type === 'conditional') {
-					// } else if (step.type === 'dynamic') {
+						console.log(`stream started: ${sid}`);
+						break;
+					}
+
+					case 'media':
+					case 'mark':
+						if (!streams.has(sid)) return;
+						const callSession = streams.get(sid);
+						await callSession?.processEvent(data);
+						break;
+
+					// case 'media': {
+					// 	if (!streams.has(sid)) return;
+					// 	const stream = streams.get(sid);
+
+					// 	if (stream?.shouldRecord) {
+					// 		const chunk = decodeMulawChunk(data.media.payload);
+					// 		stream.audioBuffer.push(chunk);
+					// 	}
+
+					// 	break;
 					// }
 
-					console.log(`stream started: ${sid}`);
-					break;
+					case 'stop': {
+						// TODO: send email, create session in db, delete CallSession
+						console.log(`stream stopped: ${sid}`);
+						streams.delete(sid);
+						break;
+					}
+
+					// default:
+					// 	console.log(`unhandled event: ${data.event}`);
 				}
-
-				case 'media':
-				case 'mark':
-					if (!streams.has(sid)) return;
-					const callSession = streams.get(sid);
-					await callSession?.processEvent(data);
-					break;
-
-				// case 'media': {
-				// 	if (!streams.has(sid)) return;
-				// 	const stream = streams.get(sid);
-
-				// 	if (stream?.shouldRecord) {
-				// 		const chunk = decodeMulawChunk(data.media.payload);
-				// 		stream.audioBuffer.push(chunk);
-				// 	}
-
-				// 	break;
-				// }
-
-				case 'stop': {
-					// TODO: send email, create session in db, delete CallSession
-					console.log(`stream stopped: ${sid}`);
-					streams.delete(sid);
-					break;
-				}
-
-				// default:
-				// 	console.log(`unhandled event: ${data.event}`);
+			} catch (err) {
+				console.log('Error:', err);
 			}
 		},
 
@@ -228,7 +229,7 @@ class CallSession {
 		const audio =
 			fileName === 'blank'
 				? getBlankMulawAudio(this.currentStep.duration)
-				: await getMulawBase64FromUrl(S3.getURL(`${fileName}.wav`));
+				: await getMulawBase64FromURL(S3.getURL(`${fileName}.wav`));
 
 		this.ws.send(
 			JSON.stringify({
