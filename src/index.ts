@@ -255,7 +255,7 @@ class CallSession {
 			const template = emailTemplates.docs[0].data();
 
 			// TODO: await SendGrid.sendEmail()
-			emailSent = true;
+			// emailSent = true;
 		}
 
 		await createUserSession({
