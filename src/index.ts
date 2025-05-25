@@ -192,6 +192,9 @@ class CallSession {
 						await this.sendAudio(mulaw, this.currentStep.name);
 
 						this.audioBuffer = [];
+					} else if (this.currentStep?.type === 'listen') {
+						const silence = getBlankMulawAudio(this.currentStep.duration);
+						await this.sendAudio(silence, this.currentStep.name);
 					} else {
 						await this.sendAudio(`${this.currentStep.name}.wav`, this.currentStep.name);
 					}
@@ -251,6 +254,10 @@ class CallSession {
 
 		if (!emailTemplates.empty) {
 			const template = emailTemplates.docs[0].data();
+
+			const variables = {
+				...this.user
+			};
 
 			// TODO: await SendGrid.sendEmail()
 			// emailSent = true;
