@@ -2,7 +2,12 @@ import { Elysia, t } from 'elysia';
 import { twiml } from 'twilio';
 import { db } from './services/firebase';
 import { logger } from './middleware/logger';
-import { decodeMulawChunk, getBlankMulawAudio, getMulawBase64FromURL } from './services/audio';
+import {
+	decodeMulawChunk,
+	getBlankMulawAudio,
+	getMulawBase64FromURL,
+	getMulawFromURL
+} from './services/audio';
 import { S3 } from './services/s3';
 import { sleep } from 'bun';
 import type { ElysiaWS } from 'elysia/ws';
@@ -228,16 +233,32 @@ class CallSession {
 		console.log({ fileName });
 		const audio =
 			fileName === 'blank'
-				? getBlankMulawAudio(this.currentStep.duration)
-				: await getMulawBase64FromURL(S3.getURL(`${fileName}.wav`));
+				? // TODO: fix getblankmulaw audio to return uint8
+				  getBlankMulawAudio(this.currentStep.duration)
+				: await getMulawFromURL(S3.getURL(`${fileName}.wav`));
 
-		this.ws.send(
-			JSON.stringify({
-				event: 'media',
-				streamSid: this.streamSid,
-				media: { payload: audio }
-			})
-		);
+		for (let i = 0; i < audio.length; i += 160) {
+			const chunk = audio.slice(i, i + 160);
+			const payload = Buffer.from(chunk).toString('base64');
+
+			this.ws.send(
+				JSON.stringify({
+					event: 'media',
+					streamSid: this.streamSid,
+					media: { payload }
+				})
+			);
+
+			await sleep(20);
+		}
+
+		// this.ws.send(
+		// 	JSON.stringify({
+		// 		event: 'media',
+		// 		streamSid: this.streamSid,
+		// 		media: { payload: audio }
+		// 	})
+		// );
 
 		await sleep(1);
 
