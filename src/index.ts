@@ -243,7 +243,7 @@ class CallSession {
 
 	async finish() {
 		const callTS = new Date(this.callBegin).toISOString();
-		const callDuration = Date.now() - this.callBegin;
+		const callDuration = Math.round((Date.now() - this.callBegin) / 1000);
 		// TODO: uncomment
 		// await updateUserFields(this.user, callTS);
 
