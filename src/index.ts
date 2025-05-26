@@ -173,6 +173,7 @@ class CallSession {
 
 						const prompt = getConditionalPrompt(this.currentStep.question, transcript);
 						const response = await OpenAI.chatGPT(prompt);
+						this.gptResponses.push(response!);
 
 						const fileName = `${this.currentStep?.[response?.toLowerCase() || 'no']}.wav`;
 						await this.sendAudio(fileName, this.currentStep.name);
@@ -186,8 +187,8 @@ class CallSession {
 						const prompt = getDynamicPrompt(this.currentStep.question, transcript);
 						const response = await OpenAI.chatGPT(prompt);
 						this.gptResponses.push(response!);
-						const wavBuf = await OpenAI.textToSpeech(response!);
 
+						const wavBuf = await OpenAI.textToSpeech(response!);
 						const mulaw = await wavToMulawBase64(wavBuf);
 						await this.sendAudio(mulaw, this.currentStep.name);
 
