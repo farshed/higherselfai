@@ -143,10 +143,15 @@ class CallSession {
 		public user: any,
 		public script: any
 	) {
-		this.currentStep = script.steps.shift();
-		if (this.currentStep) {
+		this.currentStep = script.steps[0];
+		if (!this.currentStep?.type) {
+			this.currentStep.steps.shift();
 			const label = this.currentStep.name;
 			this.sendAudio(`${label}.wav`, label);
+		} else {
+			this.currentStep = { name: 'pre-opening' };
+			const silence = getBlankMulawAudio(0.1);
+			this.sendAudio(silence, 'pre-opening');
 		}
 	}
 
