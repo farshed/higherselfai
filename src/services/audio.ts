@@ -3,6 +3,7 @@ import { PassThrough } from 'stream';
 import ffmpegPath from 'ffmpeg-static';
 
 export async function getMulawBase64FromURL(url: string) {
+	console.log({ url });
 	const res = await fetch(url);
 	if (!res.ok) throw new Error(`failed to fetch: ${res.status}`);
 
