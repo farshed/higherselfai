@@ -19,6 +19,7 @@ import {
 } from './services/openai';
 import { SendGrid } from './services/sendgrid';
 import { endCall } from './services/twilio';
+import { injectVars } from './utils';
 
 const { VoiceResponse } = twiml;
 
@@ -128,6 +129,7 @@ const app = new Elysia()
 console.log(`🦊 Server is running at ${app.server?.hostname}:${app.server?.port}`);
 
 class CallSession {
+	pastSteps: any[] = [];
 	currentStep: any;
 	audioBuffer: Uint8Array[] = [];
 	transcripts: string[] = [];
@@ -161,6 +163,7 @@ class CallSession {
 
 			case 'mark': {
 				if (data.mark.name === this.currentStep.name) {
+					this.pastSteps.push(this.currentStep);
 					this.currentStep = this.script.steps.shift();
 					if (!this.currentStep) {
 						return endCall(this.callSid);
@@ -171,29 +174,70 @@ class CallSession {
 						const transcript = await transcribeMulawBuffer(buf);
 						this.transcripts.push(transcript);
 
-						const prompt = getConditionalPrompt(this.currentStep.question, transcript);
+						const prompt = getConditionalPrompt(
+							this.currentStep.question,
+							transcript,
+							this.currentStep.prompt
+						);
 						const response = await OpenAI.chatGPT(prompt);
 						this.gptResponses.push(response!);
 
-						const fileName = `${this.currentStep?.[response?.toLowerCase() || 'no']}.wav`;
+						const fileName = `${
+							this.currentStep?.[response?.toLowerCase() || this.currentStep?.default]
+						}.wav`;
 						await this.sendAudio(fileName, this.currentStep.name);
 
 						this.audioBuffer = [];
-					} else if (this.currentStep?.type === 'dynamic') {
+					} else if (this.currentStep?.type === 'conditional-generated') {
 						const buf = Buffer.concat(this.audioBuffer.map((chunk) => Buffer.from(chunk)));
 						const transcript = await transcribeMulawBuffer(buf);
 						this.transcripts.push(transcript);
 
-						const prompt = getDynamicPrompt(this.currentStep.question, transcript);
+						const prompt = getConditionalPrompt(
+							this.currentStep.question,
+							transcript,
+							this.currentStep.prompt
+						);
 						const response = await OpenAI.chatGPT(prompt);
 						this.gptResponses.push(response!);
+
+						const template =
+							this.currentStep?.[response?.toLowerCase() || this.currentStep?.default];
+						const responseText = injectVars(template, { name: this.user.name });
+
+						const wavBuf = await OpenAI.textToSpeech(responseText);
+						const mulaw = await wavToMulawBase64(wavBuf);
+						await this.sendAudio(mulaw, this.currentStep.name);
+
+						this.audioBuffer = [];
+					} else if (this.currentStep?.type === 'dynamic') {
+						let response: any;
+
+						if (this.currentStep.response) {
+							response = injectVars(this.currentStep.response, {
+								name: this.user.name
+							});
+						} else {
+							const buf = Buffer.concat(this.audioBuffer.map((chunk) => Buffer.from(chunk)));
+							const transcript = await transcribeMulawBuffer(buf);
+							this.transcripts.push(transcript);
+
+							const prompt = getDynamicPrompt(
+								this.currentStep.question,
+								transcript,
+								this.currentStep.prompt,
+								this.user.name
+							);
+							response = await OpenAI.chatGPT(prompt);
+							this.gptResponses.push(response!);
+						}
 
 						const wavBuf = await OpenAI.textToSpeech(response!);
 						const mulaw = await wavToMulawBase64(wavBuf);
 						await this.sendAudio(mulaw, this.currentStep.name);
 
 						this.audioBuffer = [];
-					} else if (this.currentStep?.type === 'listen') {
+					} else if (['listen', 'pause'].includes(this.currentStep?.type)) {
 						const silence = getBlankMulawAudio(this.currentStep.duration);
 						await this.sendAudio(silence, this.currentStep.name);
 					} else {
