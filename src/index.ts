@@ -368,7 +368,8 @@ class RealtimeCallSession {
 					tools: [
 						{
 							name: 'end_call',
-							description: `Function to be called when you reach the end of the script.`
+							description: `Function to be called when you reach the end of the script.`,
+							type: 'function'
 						}
 					]
 				}
