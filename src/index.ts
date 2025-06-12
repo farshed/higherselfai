@@ -346,29 +346,31 @@ class RealtimeCallSession {
 		public script: any
 	) {
 		this.rt.on('error', (err) => console.log('Error', err));
-		this.rt.send({
-			type: 'session.update',
-			session: {
-				turn_detection: { type: 'server_vad' },
-				input_audio_format: 'g711_ulaw',
-				output_audio_format: 'g711_ulaw',
-				voice: 'ballad',
-				instructions: `${this.script.systemPrompt}
+		this.rt.socket.onopen = () => {
+			this.rt.send({
+				type: 'session.update',
+				session: {
+					turn_detection: { type: 'server_vad' },
+					input_audio_format: 'g711_ulaw',
+					output_audio_format: 'g711_ulaw',
+					voice: 'ballad',
+					instructions: `${this.script.systemPrompt}
 				
 				Use the script given below to guide the flow of conversation. If the user deviates, gently bring him back to align the conversation with the script. Don't let the user drag the conversation. Once you're finished with the script, end the call by calling the 'end_call' function.
 				
 				Script:
 				${injectVars(this.script.body, this.user)}`,
-				modalities: ['text', 'audio'],
-				tool_choice: 'auto',
-				tools: [
-					{
-						name: 'end_call',
-						description: `Function to be called when you reach the end of the script.`
-					}
-				]
-			}
-		});
+					modalities: ['text', 'audio'],
+					tool_choice: 'auto',
+					tools: [
+						{
+							name: 'end_call',
+							description: `Function to be called when you reach the end of the script.`
+						}
+					]
+				}
+			});
+		};
 
 		this.rt.on('response.audio.delta', (data) => {
 			this.ws.send(
