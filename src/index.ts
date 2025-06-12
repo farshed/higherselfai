@@ -21,6 +21,7 @@ import {
 import { SendGrid } from './services/sendgrid';
 import { endCall } from './services/twilio';
 import { injectVars } from './utils';
+import { OpenAIRealtimeWS } from 'openai/beta/realtime/ws.mjs';
 
 const { VoiceResponse } = twiml;
 
@@ -336,7 +337,7 @@ class PrerecordedCallSession {
 
 class RealtimeCallSession {
 	callType = 'realtime';
-	rt: OpenAIRealtimeWebSocket;
+	rt: OpenAIRealtimeWS;
 
 	constructor(
 		public callSid: string,
@@ -345,9 +346,9 @@ class RealtimeCallSession {
 		public user: any,
 		public script: any
 	) {
-		this.rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+		this.rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 		console.log('adding on open handler');
-		this.rt.socket.addEventListener('open', () => {
+		this.rt.socket.on('open', () => {
 			console.log('openai socket open');
 			this.rt.send({
 				type: 'session.update',
