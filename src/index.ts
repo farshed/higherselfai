@@ -49,6 +49,8 @@ const app = new Elysia()
 				.limit(1)
 				.get();
 
+			// TODO: User is allowed only one call per day.
+
 			if (users.empty) return;
 			const user = users.docs[0].data();
 
@@ -337,7 +339,7 @@ class PrerecordedCallSession {
 
 class RealtimeCallSession {
 	callType = 'realtime';
-	rt: OpenAIRealtimeWS;
+	rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 
 	constructor(
 		public callSid: string,
@@ -346,8 +348,6 @@ class RealtimeCallSession {
 		public user: any,
 		public script: any
 	) {
-		this.rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
-		console.log('adding on open handler');
 		this.rt.socket.on('open', () => {
 			console.log('openai socket open');
 			this.rt.send({
@@ -357,17 +357,20 @@ class RealtimeCallSession {
 					input_audio_format: 'g711_ulaw',
 					output_audio_format: 'g711_ulaw',
 					voice: 'ballad',
-					instructions: `${this.script.systemPrompt}
-				
-				Use the script given below to guide the flow of conversation. If the user deviates, gently bring him back to align the conversation with the script. Don't let the user drag the conversation. Once you're finished with the script, end the call by calling the 'end_call' function.
+					instructions: `${
+						this.script.systemPrompt ||
+						`Use the script given below to guide the flow of conversation. If the user deviates, gently bring them back to align the conversation with the script. Don't let the user drag the conversation. Keep your tone upbeat and positive. At any point, do not pause talking unless it's to let the user answer a question you asked.`
+					}
 				
 				Script:
-				${injectVars(this.script.body, this.user)}`,
+				${injectVars(this.script.body, this.user)}
+				
+				Once you reach the end of the script, call the 'finished' function.`,
 					modalities: ['text', 'audio'],
 					tool_choice: 'auto',
 					tools: [
 						{
-							name: 'end_call',
+							name: 'finished',
 							description: `Function to be called when you reach the end of the script.`,
 							type: 'function'
 						}
