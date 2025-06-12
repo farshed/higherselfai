@@ -41,7 +41,6 @@ const script2 = {
 	day: 2,
 	steps: [
 		{ type: 'dynamic', name: 'opening', response: 'Hi {{name}}, how are you feeling today?' },
-		// { type: 'pause', name: 'opening-pause-1', duration: 3 },
 		{ type: 'listen', name: 'opening-listen', duration: 3 },
 		{
 			type: 'conditional',
@@ -106,7 +105,7 @@ C) I know I have it — but I'm afraid to prove it.`,
 			response: '{{name}}, that pause is where power begins.'
 		},
 
-		{ type: '2-reflection' },
+		{ name: '2-reflection' },
 		{ type: 'listen', name: 'reflection-listen', duration: 5 },
 
 		{

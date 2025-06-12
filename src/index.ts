@@ -1,5 +1,6 @@
 import { Elysia, t } from 'elysia';
 import { twiml } from 'twilio';
+import { OpenAIRealtimeWebSocket } from 'openai/beta/realtime/websocket';
 import { createUserSession, db, updateUserFields } from './services/firebase';
 import { logger } from './middleware/logger';
 import {
@@ -22,6 +23,8 @@ import { endCall } from './services/twilio';
 import { injectVars } from './utils';
 
 const { VoiceResponse } = twiml;
+
+type CallSession = PrerecordedCallSession | RealtimeCallSession;
 
 const streams = new Map<string, CallSession>();
 const callers = new Map<string, { user: any; script: any }>();
@@ -88,6 +91,8 @@ const app = new Elysia()
 						if (!caller) return;
 
 						const { script, user } = caller;
+						const CallSession =
+							script.type === 'realtime' ? RealtimeCallSession : PrerecordedCallSession;
 						const callSession = new CallSession(callSid, sid, ws, user, script);
 						streams.set(sid, callSession);
 
@@ -97,6 +102,7 @@ const app = new Elysia()
 					case 'media':
 					case 'mark': {
 						if (!streams.has(sid)) return;
+						// callType = 'prerecorded';
 						const callSession = streams.get(sid);
 						await callSession?.processEvent(data);
 
@@ -128,7 +134,8 @@ const app = new Elysia()
 
 console.log(`🦊 Server is running at ${app.server?.hostname}:${app.server?.port}`);
 
-class CallSession {
+class PrerecordedCallSession {
+	callType = 'prerecorded';
 	pastSteps: any[] = [];
 	currentStep: any;
 	audioBuffer: Uint8Array[] = [];
@@ -325,6 +332,76 @@ class CallSession {
 			emailSent
 		});
 	}
+}
+
+class RealtimeCallSession {
+	callType = 'realtime';
+	rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+
+	constructor(
+		public callSid: string,
+		public streamSid: string,
+		public ws: ElysiaWS,
+		public user: any,
+		public script: any
+	) {
+		this.rt.send({
+			type: 'session.update',
+			session: {
+				turn_detection: { type: 'server_vad' },
+				input_audio_format: 'g711_ulaw',
+				output_audio_format: 'g711_ulaw',
+				voice: 'ballad',
+				instructions: `${this.script.systemPrompt}
+				
+				Use the script given below to guide the flow of conversation. If the user deviates, gently bring him back to align the conversation with the script. Don't let the user drag the conversation. Once you're finished with the script, end the call by calling the 'end_call' function.
+				
+				Script:
+				${injectVars(this.script.body, this.user)}`,
+				modalities: ['text', 'audio'],
+				tool_choice: 'auto',
+				tools: [
+					{
+						name: 'end_call',
+						description: `Function to be called when you reach the end of the script.`
+					}
+				]
+			}
+		});
+
+		this.rt.on('response.audio.delta', (data) => {
+			this.ws.send(
+				JSON.stringify({
+					event: 'media',
+					streamSid: this.streamSid,
+					media: { payload: Buffer.from(data.delta, 'base64').toString('base64') }
+				})
+			);
+		});
+
+		this.rt.on('response.function_call_arguments.delta', (data) => {
+			console.log('func call', data.delta);
+
+			// this.finish()
+			// 	.finally(() => streams.delete(this.streamSid))
+			// 	.catch(() => {});
+		});
+	}
+
+	async processEvent(data: any) {
+		try {
+			if (data.event === 'media' && this.rt.socket.readyState === this.rt.socket.OPEN) {
+				this.rt.send({
+					type: 'input_audio_buffer.append',
+					audio: data.media.payload
+				});
+			}
+		} catch (err) {
+			console.log(err);
+		}
+	}
+
+	async finish() {}
 }
 
 // async function test() {
