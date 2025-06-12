@@ -346,7 +346,7 @@ class RealtimeCallSession {
 		public script: any
 	) {
 		this.rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
-		this.rt.socket.on('open', () => {
+		this.rt.socket.addEventListener('open', () => {
 			console.log('openai socket open');
 			this.rt.send({
 				type: 'session.update',
