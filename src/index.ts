@@ -391,7 +391,9 @@ class RealtimeCallSession {
 			);
 		});
 
-		// this.rt.on('response.text.delta', (data) => {})
+		this.rt.on('response.text.delta', (data) => {
+			console.log('text', data.delta);
+		});
 		// this.rt.on('conversation.item.input_audio_transcription.completed')
 
 		this.rt.on('response.function_call_arguments.done', (data) => {
