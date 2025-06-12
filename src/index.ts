@@ -394,6 +394,10 @@ class RealtimeCallSession {
 		// this.rt.on('response.text.delta', (data) => {})
 		// this.rt.on('conversation.item.input_audio_transcription.completed')
 
+		this.rt.on('response.function_call_arguments.done', (data) => {
+			console.log('func call done', data);
+		});
+
 		this.rt.on('response.function_call_arguments.delta', (data) => {
 			console.log('func call', data);
 
