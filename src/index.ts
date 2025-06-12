@@ -357,6 +357,10 @@ class RealtimeCallSession {
 					input_audio_format: 'g711_ulaw',
 					output_audio_format: 'g711_ulaw',
 					voice: 'ballad',
+					input_audio_transcription: {
+						model: 'gpt-4o-transcribe',
+						language: 'en'
+					},
 					instructions: `${
 						this.script.systemPrompt ||
 						`Use the script given below to guide the flow of conversation. If the user deviates, gently bring them back to align the conversation with the script. Don't let the user drag the conversation. Keep your tone upbeat and positive. Do not wait for the user to speak first. At any point, do not pause talking unless it's to let the user answer a question you asked.`
@@ -394,7 +398,9 @@ class RealtimeCallSession {
 		this.rt.on('response.text.delta', (data) => {
 			console.log('text', data.delta);
 		});
-		// this.rt.on('conversation.item.input_audio_transcription.completed')
+		this.rt.on('conversation.item.input_audio_transcription.completed', (data) => {
+			console.log('transcript', data.transcript);
+		});
 
 		this.rt.on('response.function_call_arguments.done', (data) => {
 			console.log('func call done', data);
