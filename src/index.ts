@@ -345,6 +345,7 @@ class RealtimeCallSession {
 		public user: any,
 		public script: any
 	) {
+		this.rt.on('error', (err) => console.log('Error', err));
 		this.rt.send({
 			type: 'session.update',
 			session: {
