@@ -336,7 +336,7 @@ class PrerecordedCallSession {
 
 class RealtimeCallSession {
 	callType = 'realtime';
-	rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+	rt: OpenAIRealtimeWebSocket;
 
 	constructor(
 		public callSid: string,
@@ -345,7 +345,7 @@ class RealtimeCallSession {
 		public user: any,
 		public script: any
 	) {
-		this.rt.on('error', (err) => console.log('Error', err));
+		this.rt = new OpenAIRealtimeWebSocket({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 		this.rt.socket.onopen = () => {
 			console.log('openai socket open');
 			this.rt.send({
@@ -372,6 +372,8 @@ class RealtimeCallSession {
 				}
 			});
 		};
+
+		this.rt.on('error', (err) => console.log('Error', err));
 
 		this.rt.on('response.audio.delta', (data) => {
 			this.ws.send(
