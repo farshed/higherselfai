@@ -347,6 +347,7 @@ class RealtimeCallSession {
 	) {
 		this.rt.on('error', (err) => console.log('Error', err));
 		this.rt.socket.onopen = () => {
+			console.log('openai socket open');
 			this.rt.send({
 				type: 'session.update',
 				session: {
