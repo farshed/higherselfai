@@ -363,7 +363,7 @@ class RealtimeCallSession {
 					},
 					instructions: `${
 						this.script.systemPrompt ||
-						`Use the script given below to guide the flow of conversation. If the user deviates, gently bring them back to align the conversation with the script. Don't let the user drag the conversation. Keep your tone upbeat and positive. Do not wait for the user to speak first. At any point, do not pause talking unless it's to let the user answer a question you asked.`
+						`Use the script given below to guide the flow of conversation. If the user deviates, gently bring them back to align the conversation with the script. Don't let the user drag the conversation. Keep your tone upbeat and positive. Do not wait for the user to speak first. Start the conversation with "Hello, ${this.user.name}". At any point, do not pause talking unless it's to let the user answer a question you asked.`
 					}
 				
 				Script:
