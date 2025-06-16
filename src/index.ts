@@ -340,6 +340,7 @@ class PrerecordedCallSession {
 class RealtimeCallSession {
 	callType = 'realtime';
 	rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
+	transcript: any[] = [];
 
 	constructor(
 		public callSid: string,
@@ -363,13 +364,13 @@ class RealtimeCallSession {
 					},
 					instructions: `${
 						this.script.systemPrompt ||
-						`Use the script given below to guide the flow of conversation. If the user deviates, gently bring them back to align the conversation with the script. Don't let the user drag the conversation. Keep your tone upbeat and positive. Do not wait for the user to speak first. Start the conversation with "Hello, ${this.user.name}". At any point, do not pause talking unless it's to let the user answer a question you asked.`
+						`Use the script given below to guide the flow of conversation. If the user deviates, gently bring them back to align the conversation with the script. Don't let the user drag the conversation. Keep your tone upbeat and positive. Do not wait for the user to speak first. Preemptively start the conversation with "Hello, ${this.user.name}". At any point, do not pause talking unless it's to let the user answer a question you asked.`
 					}
 				
 				Script:
 				${injectVars(this.script.body, this.user)}
 				
-				Once you reach the end of the script, call the 'finished' function.`,
+				Once you reach the end of the script, call the 'finished' function. Do not respond in any way once you've called 'finished'.`,
 					modalities: ['text', 'audio'],
 					tool_choice: 'auto',
 					tools: [
@@ -403,16 +404,18 @@ class RealtimeCallSession {
 		});
 
 		this.rt.on('response.function_call_arguments.done', (data) => {
-			console.log('func call done', data);
+			console.log('func call done');
+
+			this.finish();
 		});
 
-		this.rt.on('response.function_call_arguments.delta', (data) => {
-			console.log('func call', data);
+		// this.rt.on('response.function_call_arguments.delta', (data) => {
+		// 	console.log('func call', data);
 
-			// this.finish()
-			// 	.finally(() => streams.delete(this.streamSid))
-			// 	.catch(() => {});
-		});
+		// 	this.finish()
+		// 		.finally(() => streams.delete(this.streamSid))
+		// 		.catch(() => {});
+		// });
 	}
 
 	async processEvent(data: any) {
@@ -428,7 +431,11 @@ class RealtimeCallSession {
 		}
 	}
 
-	async finish() {}
+	async finish() {
+		await Bun.sleep(2500);
+		this.rt.close();
+		streams.delete(this.streamSid);
+	}
 }
 
 // async function test() {
