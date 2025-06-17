@@ -115,6 +115,8 @@ const app = new Elysia()
 					case 'stop': {
 						if (!streams.has(sid)) return;
 						const callSession = streams.get(sid);
+						callSession?.ws.close();
+
 						await callSession?.finish();
 						streams.delete(sid);
 						console.log(`stream stopped: ${sid}`);
@@ -379,7 +381,7 @@ class RealtimeCallSession {
 				Script:
 				${injectVars(this.script.body, this.user)}
 				
-				Once you reach the end of the script, call the 'finished' function. Do not respond in any way once you've called 'finished'.`
+				Once you reach the very end of the script and have nothing more to say, call the 'finished' function.`
 				}
 			});
 		});
@@ -406,7 +408,7 @@ class RealtimeCallSession {
 		this.rt.on('response.function_call_arguments.done', (data) => {
 			console.log('func call done');
 
-			this.finish();
+			setTimeout(this.finish, 10);
 		});
 
 		this.rt.send({
@@ -440,7 +442,6 @@ class RealtimeCallSession {
 	}
 
 	async finish() {
-		await Bun.sleep(2500);
 		this.rt.close();
 		this.ws.close();
 		streams.delete(this.streamSid);
