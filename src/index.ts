@@ -393,7 +393,7 @@ class RealtimeCallSession {
 				JSON.stringify({
 					event: 'media',
 					streamSid: this.streamSid,
-					media: { payload: Buffer.from(data.delta, 'base64').toString('base64') }
+					media: { payload: data.delta }
 				})
 			);
 		});
