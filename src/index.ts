@@ -408,7 +408,7 @@ class RealtimeCallSession {
 		this.rt.on('response.function_call_arguments.done', (data) => {
 			console.log('func call done');
 
-			setTimeout(this.finish, 10);
+			setTimeout(this.finish, 12000);
 		});
 
 		this.rt.send({
