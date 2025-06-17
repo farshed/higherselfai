@@ -343,6 +343,8 @@ class RealtimeCallSession {
 	callType = 'realtime';
 	rt = new OpenAIRealtimeWS({ model: 'gpt-4o-realtime-preview-2024-12-17' });
 	transcript: any[] = [];
+	finishedCalled = false;
+	silenceChunksCount = 0;
 
 	constructor(
 		public callSid: string,
@@ -389,6 +391,11 @@ class RealtimeCallSession {
 		this.rt.on('error', (err) => console.log('Error', err));
 
 		this.rt.on('response.audio.delta', (data) => {
+			if (this.finishedCalled) {
+			}
+
+			console.log(Buffer.from(data.delta, 'base64').length);
+
 			this.ws.send(
 				JSON.stringify({
 					event: 'media',
