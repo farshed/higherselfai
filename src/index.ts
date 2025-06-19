@@ -7,6 +7,7 @@ import {
 	decodeMulawChunk,
 	getBlankMulawAudio,
 	getMulawBase64FromURL,
+	readMulawWav,
 	wavToMulawBase64
 } from './services/audio';
 import { S3 } from './services/s3';
@@ -418,12 +419,19 @@ class RealtimeCallSession {
 			setTimeout(this.finish, 30000);
 		});
 
-		this.rt.send({
-			type: 'conversation.item.create',
-			item: {
-				role: 'user',
-				content: [{ type: 'input_text', text: 'Hello' }]
-			}
+		// this.rt.send({
+		// 	type: 'conversation.item.create',
+		// 	item: {
+		// 		role: 'user',
+		// 		content: [{ type: 'input_text', text: 'Hello' }]
+		// 	}
+		// });
+
+		readMulawWav('./hello.wav').then((result) => {
+			this.rt.send({
+				type: 'input_audio_buffer.append',
+				audio: result
+			});
 		});
 
 		// this.rt.on('response.function_call_arguments.delta', (data) => {

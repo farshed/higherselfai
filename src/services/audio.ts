@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import { PassThrough } from 'stream';
 import ffmpegPath from 'ffmpeg-static';
+import fs from 'fs/promises';
 
 export async function getMulawBase64FromURL(url: string) {
 	console.log({ url });
@@ -149,4 +150,17 @@ export function isG711uLawSilentBase64(chunk: string, threshold = 4) {
 export function g711uChunkDurationMS(chunk: string) {
 	const byteLength = Buffer.from(chunk, 'base64').length;
 	return (byteLength / 8000) * 1000;
+}
+
+export async function readMulawWav(path: string) {
+	const f = await fs.readFile(path);
+	const buf = Buffer.from(f);
+
+	const dataOffset = buf.indexOf('data');
+	if (dataOffset === -1) throw new Error('no data chunk found');
+
+	const dataStart = dataOffset + 8;
+	const rawMulaw = buf.subarray(dataStart);
+
+	return rawMulaw.toString('base64');
 }
