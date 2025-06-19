@@ -387,6 +387,13 @@ class RealtimeCallSession {
 				Once you reach the very end of the script and have nothing more to say, call the 'finished' function.`
 				}
 			});
+
+			readMulawWav('./hello.wav').then((result) => {
+				this.rt.send({
+					type: 'input_audio_buffer.append',
+					audio: result
+				});
+			});
 		});
 
 		this.rt.on('error', (err) => console.log('Error', err));
@@ -426,13 +433,6 @@ class RealtimeCallSession {
 		// 		content: [{ type: 'input_text', text: 'Hello' }]
 		// 	}
 		// });
-
-		readMulawWav('./hello.wav').then((result) => {
-			this.rt.send({
-				type: 'input_audio_buffer.append',
-				audio: result
-			});
-		});
 
 		// this.rt.on('response.function_call_arguments.delta', (data) => {
 		// 	console.log('func call', data);
