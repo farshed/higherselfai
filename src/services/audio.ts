@@ -134,3 +134,19 @@ export class MulawToWavStream {
 		return this.output;
 	}
 }
+
+export function isG711uLawSilentBase64(chunk: string, threshold = 4) {
+	const buffer = Buffer.from(chunk, 'base64');
+	for (let i = 0; i < buffer.length; i++) {
+		const sample = buffer[i];
+		if (Math.abs(sample - 0x7f) > threshold) {
+			return false;
+		}
+	}
+	return true;
+}
+
+export function g711uChunkDurationMS(chunk: string) {
+	const byteLength = Buffer.from(chunk, 'base64').length;
+	return (byteLength / 8000) * 1000;
+}

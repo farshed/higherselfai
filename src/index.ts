@@ -391,8 +391,8 @@ class RealtimeCallSession {
 		this.rt.on('error', (err) => console.log('Error', err));
 
 		this.rt.on('response.audio.delta', (data) => {
-			if (this.finishedCalled) {
-			}
+			// if (this.finishedCalled) {
+			// }
 
 			console.log(Buffer.from(data.delta, 'base64').length);
 
@@ -415,7 +415,7 @@ class RealtimeCallSession {
 		this.rt.on('response.function_call_arguments.done', (data) => {
 			console.log('func call done');
 
-			setTimeout(this.finish, 12000);
+			setTimeout(this.finish, 30000);
 		});
 
 		this.rt.send({
@@ -449,7 +449,7 @@ class RealtimeCallSession {
 	}
 
 	async finish() {
-		this.rt.close();
+		// this.rt.close();
 		this.ws.close();
 		streams.delete(this.streamSid);
 	}
