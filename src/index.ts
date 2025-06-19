@@ -116,10 +116,8 @@ const app = new Elysia()
 					case 'stop': {
 						if (!streams.has(sid)) return;
 						const callSession = streams.get(sid);
-						callSession?.ws.close();
 
 						await callSession?.finish();
-						streams.delete(sid);
 						console.log(`stream stopped: ${sid}`);
 						break;
 					}
@@ -457,8 +455,8 @@ class RealtimeCallSession {
 	}
 
 	async finish() {
-		// this.rt.close();
-		this.ws.close();
+		this?.rt?.close?.();
+		this?.ws?.close?.();
 		streams.delete(this.streamSid);
 	}
 }
